@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>首爾行程導航助手 v6.1 (Naver App修復版)</title>
+    <title>首爾行程導航助手 v6.2 (擴充版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -23,8 +23,9 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // 預設地點數據庫
+        // 預設地點數據庫 (已更新至 v6.2)
         const defaultLocations = [
+            // --- 原有地點 ---
             { id: 1, name: "明洞大使館換錢所", krName: "대사관앞환전", lat: 37.5635, lng: 126.9837, desc: "明洞2街105號" },
             { id: 2, name: "弘大-橡子漫畫 (Acorn Comics)", krName: "도토리캐리커쳐", lat: 37.5614, lng: 126.9255, desc: "延南洞本店" },
             { id: 3, name: "弘大-SPAO", krName: "스파오 홍대", lat: 37.5559, lng: 126.9238, desc: "弘大9號出口附近" },
@@ -38,9 +39,18 @@
             { id: 11, name: "弘大-Olive Young (遊樂場店)", krName: "올리브영 홍대놀이터점", lat: 37.5528, lng: 126.9235, desc: "HEDX遊樂場分店旁" },
             { id: 12, name: "弘大女人街", krName: "홍대 걷고싶은거리", lat: 37.5568, lng: 126.9246, desc: "8號出口附近" },
             { id: 13, name: "AK PLAZA 弘大", krName: "AK플라자 홍대", lat: 37.5574, lng: 126.9259, desc: "4號出口" },
-            { id: 14, name: "弘大美食-豚壽百豬肉湯飯", krName: "돈수백", lat: 37.5556, lng: 126.9229, desc: "24小時營業" },
+            // 更新舊資料 (ID 14)
+            { id: 14, name: "弘大美食-豚壽百豬肉湯飯", krName: "돈수백 홍대직영점", lat: 37.5559, lng: 126.9232, desc: "24小時營業 (弘益路6街74)" },
             { id: 15, name: "弘大-自然道鹽麵包", krName: "자연도소금빵", lat: 37.5583, lng: 126.9242, desc: "2號出口附近" },
-            { id: 16, name: "延南洞-JUUNEEDU (睡衣)", krName: "쥬니쥬", lat: 37.5618, lng: 126.9268, desc: "延南洞" }
+            { id: 16, name: "延南洞-JUUNEEDU (睡衣)", krName: "쥬니쥬", lat: 37.5618, lng: 126.9268, desc: "延南洞" },
+            
+            // --- 新增地點 ---
+            { id: 17, name: "延南洞-Hippo Brunch House", krName: "히포 브런치하우스", lat: 37.56437, lng: 126.92535, desc: "09:00-21:30 (聖美山路17街85)" },
+            { id: 18, name: "延禧洞-Grain Seoul", krName: "그레인 서울", lat: 37.56847, lng: 126.93045, desc: "早午餐 09:00-17:30 (延禧路11Ga街53)" },
+            { id: 19, name: "弘大-21世紀我們大海水產", krName: "21세기 우리바다수산", lat: 37.5566, lng: 126.9208, desc: "生魚片/弘大1號出口 (東橋洞206-5)" },
+            { id: 20, name: "明洞-孝談刀削麵一隻雞", krName: "효담칼국수 닭한마리", lat: 37.5627, lng: 126.9852, desc: "明洞總店 B1 (明洞3街12)" },
+            { id: 21, name: "弘大-LOOF (衣服店)", krName: "루프", lat: 37.5532, lng: 126.9223, desc: "弘大商店街 B1 (弘益路3街20)" },
+            { id: 22, name: "延南洞-Heod 早午餐", krName: "해옫 연남", lat: 37.5653, lng: 126.9247, desc: "11:00-21:00 (聖美山路29街30)" }
         ];
 
         // 延遲函式
@@ -53,7 +63,7 @@
             
             // Selection & Location
             const [startPoint, setStartPoint] = React.useState("current");
-            const [endPoint, setEndPoint] = React.useState(defaultLocations[1].id);
+            const [endPoint, setEndPoint] = React.useState(defaultLocations[1].id); // 預設: 橡子漫畫
             const [userLocation, setUserLocation] = React.useState(null);
             const [locationError, setLocationError] = React.useState(null);
             
@@ -309,7 +319,7 @@
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white rounded-b-3xl shadow-lg mb-6 flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-bold mb-1">首爾行程助手</h1>
-                            <p className="text-blue-100 text-sm opacity-90">v6.1 Naver App修復版</p>
+                            <p className="text-blue-100 text-sm opacity-90">v6.2 擴充版</p>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => setShowSettingsModal(true)} className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full w-10 h-10 flex items-center justify-center transition relative">
