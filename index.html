@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>首爾行程導航助手 v8.0 (地圖全覽版)</title>
+    <title>首爾行程導航助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -47,7 +47,7 @@
             OTHER: "🏨 住宿/其他"
         };
 
-        // 預設地點數據庫 (已更新至 v7.1 並加入分類)
+        // 預設地點數據庫 (已更新至 v8.0)
         const defaultLocations = [
             // --- 購物/服飾 ---
             { id: 3, name: "弘大-SPAO", krName: "스파오 홍대", lat: 37.5559, lng: 126.9238, desc: "弘大9號出口附近", category: "SHOPPING" },
@@ -96,6 +96,7 @@
             { id: 35, name: "新沙洞-元祖馬山 (醬蟹)", krName: "원조마산아구찜", lat: 37.5145, lng: 127.0195, desc: "新沙洞醬蟹老店", category: "FOOD" },
             { id: 38, name: "安國-倫敦貝果博物館", krName: "런던베이글뮤지엄 안국", lat: 37.5792, lng: 126.9865, desc: "07:00–17:30", category: "FOOD" },
             { id: 39, name: "鐘路-無垢屋 (人蔘雞)", krName: "무구옥", lat: 37.5765, lng: 126.9835, desc: "北韓人蔘雞湯", category: "FOOD" },
+            { id: 54, name: "弘大-GIT TTEUL (韓式烤肉)", krName: "깃뜰 홍대본점", lat: 37.5502, lng: 126.9215, desc: "韓式烤肉 (Jandari-ro 3an-gil 27)", category: "FOOD" },
 
             // --- 樂器/音樂 ---
             { id: 23, name: "安養-Bass Gosu Shop", krName: "베이스고수샵", lat: 37.38257, lng: 126.95830, desc: "樂器行/米家畜產旁", category: "MUSIC" },
@@ -261,7 +262,7 @@
                     {/* Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white rounded-b-3xl shadow-lg mb-4">
                         <h1 className="text-2xl font-bold mb-1">首爾行程助手</h1>
-                        <p className="text-blue-100 text-sm opacity-90">v8.0 地圖全覽版</p>
+                        <p className="text-blue-100 text-sm opacity-90">v8.0</p>
                         
                         {/* 頂部按鈕區 */}
                         <div className="flex gap-2 mt-4 justify-end">
