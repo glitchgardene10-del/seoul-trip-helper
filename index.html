@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>首爾行程導航助手 v6.3 (操作引導版)</title>
+    <title>首爾行程導航助手 v6.4 (地址修正版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -124,10 +124,23 @@
                 }
             };
 
+            // --- Address Cleaner (NEW) ---
+            // 移除韓文地址中的括號內容、樓層、號碼，讓 OSM 更容易搜尋到
+            const cleanAddress = (raw) => {
+                let cleaned = raw;
+                // 移除括號及內容 (e.g., (호계동))
+                cleaned = cleaned.replace(/\([^)]*\)/g, '');
+                // 移除 B1, 1F, 2층, 203호 等
+                cleaned = cleaned.replace(/\s(B?\d+(F|층|호))/gi, '');
+                cleaned = cleaned.replace(/,\s*South Korea/i, ''); // 暫時移除國家，最後搜尋再補
+                return cleaned.trim();
+            };
+
             // --- Basic Search (Nominatim only) ---
             const searchNominatim = async (query) => {
                 try {
                     let optimizedQuery = query;
+                    // 如果沒有國家，才加 South Korea (避免重複)
                     if (!optimizedQuery.toLowerCase().includes("korea")) optimizedQuery += ", South Korea";
                     
                     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(optimizedQuery)}&limit=1&addressdetails=1`, {
@@ -151,7 +164,7 @@
                 if (!searchQuery) return;
                 setIsFetching(true);
 
-                // 1. 座標格式
+                // 1. 座標格式 Check
                 const coordMatch = searchQuery.match(/(\d+\.\d+)\s*[,，]\s*(\d+\.\d+)/);
                 if (coordMatch) {
                     setNewLocName("自訂座標");
@@ -163,16 +176,27 @@
                     return;
                 }
 
-                // 2. OSM Search (Basic)
-                const osmResult = await searchNominatim(searchQuery);
+                // 2. OSM Search (Original)
+                let osmResult = await searchNominatim(searchQuery);
+
+                // 3. 如果失敗，嘗試「淨化地址」後再搜
+                if (!osmResult) {
+                    const cleaned = cleanAddress(searchQuery);
+                    if (cleaned !== searchQuery) {
+                        // console.log("Retrying with cleaned address:", cleaned);
+                        osmResult = await searchNominatim(cleaned);
+                    }
+                }
+
                 if (osmResult) {
-                    setNewLocName(searchQuery);
+                    setNewLocName(searchQuery); // 名稱保留原本輸入的完整字串
                     setNewLocLat(osmResult.lat);
                     setNewLocLng(osmResult.lng);
+                    // 嘗試只取第一段作為韓文名稱，避免顯示太長地址
                     setNewLocKrName(osmResult.displayName.split(",")[0]); 
                     setNewLocNote("自動搜尋結果");
                 } else {
-                    alert("找不到此地點，建議使用下方按鈕開啟 Naver Map，複製地址或座標後貼上。");
+                    alert("找不到此地點。原因可能是 OpenStreetMap 資料庫沒有該詳細地址。\n\n建議：\n1. 點擊下方『Naver Map』按鈕\n2. 在 Naver Map 找到地點後，長按地圖複製『座標』\n3. 貼回此處搜尋");
                 }
                 
                 setIsFetching(false);
@@ -228,7 +252,14 @@
                         } else {
                             // 僅使用 OSM 搜尋，無 AI
                             await delay(1100); 
-                            const osmRes = await searchNominatim(name);
+                            // 嘗試原始搜尋
+                            let osmRes = await searchNominatim(name);
+                            // 嘗試淨化搜尋
+                            if (!osmRes) {
+                                const cleaned = cleanAddress(name);
+                                if (cleaned !== name) osmRes = await searchNominatim(cleaned);
+                            }
+
                             if (osmRes) { lat = osmRes.lat; lng = osmRes.lng; autoInfo = true; }
                         }
 
@@ -319,7 +350,7 @@
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white rounded-b-3xl shadow-lg mb-6 flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-bold mb-1">首爾行程助手</h1>
-                            <p className="text-blue-100 text-sm opacity-90">v6.3 操作引導版</p>
+                            <p className="text-blue-100 text-sm opacity-90">v6.4 地址修正版</p>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => setShowSettingsModal(true)} className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full w-10 h-10 flex items-center justify-center transition relative">
@@ -437,7 +468,7 @@
                                         </label>
                                         <div className="flex gap-2 mb-2">
                                             <div className="relative flex-1">
-                                                <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="輸入地名或座標..." className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"/>
+                                                <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="輸入地名、座標或複雜地址..." className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"/>
                                                 {isFetching && <div className="absolute right-2 top-2 text-indigo-500"><i className="fas fa-circle-notch fa-spin"></i></div>}
                                             </div>
                                             <button onClick={handleSmartSearch} className="bg-indigo-600 text-white px-3 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700 whitespace-nowrap">搜尋</button>
