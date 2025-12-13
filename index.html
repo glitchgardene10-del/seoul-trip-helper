@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>首爾行程導航助手 v6.2 (擴充版)</title>
+    <title>首爾行程導航助手 v6.3 (操作引導版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -172,7 +172,7 @@
                     setNewLocKrName(osmResult.displayName.split(",")[0]); 
                     setNewLocNote("自動搜尋結果");
                 } else {
-                    alert("找不到此地點。建議直接使用 Naver Map 按鈕搜尋，確認後再貼上座標。");
+                    alert("找不到此地點，建議使用下方按鈕開啟 Naver Map，複製地址或座標後貼上。");
                 }
                 
                 setIsFetching(false);
@@ -319,7 +319,7 @@
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white rounded-b-3xl shadow-lg mb-6 flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-bold mb-1">首爾行程助手</h1>
-                            <p className="text-blue-100 text-sm opacity-90">v6.2 擴充版</p>
+                            <p className="text-blue-100 text-sm opacity-90">v6.3 操作引導版</p>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => setShowSettingsModal(true)} className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full w-10 h-10 flex items-center justify-center transition relative">
@@ -442,11 +442,15 @@
                                             </div>
                                             <button onClick={handleSmartSearch} className="bg-indigo-600 text-white px-3 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700 whitespace-nowrap">搜尋</button>
                                         </div>
-                                        <div className="flex justify-between items-center pt-2 border-t border-indigo-200">
-                                            <span className="text-[10px] text-gray-500">
-                                                搜不到？
-                                            </span>
-                                            <button onClick={() => searchQuery && window.open(`https://map.naver.com/p/search/${encodeURIComponent(searchQuery)}`, '_blank')} className="text-xs bg-green-500 text-white px-3 py-1 rounded-full font-bold hover:bg-green-600 transition flex items-center gap-1"><span className="font-black">N</span> Naver Map</button>
+                                        <div className="flex flex-col items-center pt-2 border-t border-indigo-200 space-y-2">
+                                            <div className="flex justify-between items-center w-full">
+                                                <span className="text-[10px] text-gray-500">搜不到？</span>
+                                                <button onClick={() => searchQuery && window.open(`https://map.naver.com/p/search/${encodeURIComponent(searchQuery)}`, '_blank')} className="text-xs bg-green-500 text-white px-3 py-1 rounded-full font-bold hover:bg-green-600 transition flex items-center gap-1"><span className="font-black">N</span> Naver Map</button>
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 bg-white/50 p-2 rounded w-full text-center">
+                                                <i className="fas fa-info-circle mr-1"></i>
+                                                開啟 Naver Map 後，請複製『地址』或『座標』，貼回上方搜尋欄按『搜尋』即可。
+                                            </div>
                                         </div>
                                     </div>
 
