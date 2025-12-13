@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>首爾行程導航助手 v6.4 (地址修正版)</title>
+    <title>首爾行程導航助手 v8.0 (地圖全覽版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Leaflet CSS & JS (用於顯示免費地圖) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; background-color: #f3f4f6; }
@@ -17,288 +20,187 @@
         select { -webkit-appearance: none; }
         .modal-content::-webkit-scrollbar { width: 4px; }
         .modal-content::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 4px; }
+        .ai-active { color: #8b5cf6; text-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }
+        .ai-pulse { animation: pulse-purple 2s infinite; }
+        /* Map Styles */
+        #global-map { height: 400px; width: 100%; border-radius: 16px; z-index: 0; }
+        .category-scroll::-webkit-scrollbar { display: none; } /* Hide scrollbar for category list */
+        .category-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes pulse-purple {
+            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // 預設地點數據庫 (已更新至 v6.2)
+        // 地點分類定義
+        const CATEGORIES = {
+            ALL: "全部",
+            SHOPPING: "🛍️ 購物/服飾",
+            FOOD: "🍽️ 美食/咖啡",
+            MUSIC: "🎸 樂器/音樂",
+            ATTRACTION: "📷 景點/體驗",
+            OTHER: "🏨 住宿/其他"
+        };
+
+        // 預設地點數據庫 (已更新至 v7.1 並加入分類)
         const defaultLocations = [
-            // --- 原有地點 ---
-            { id: 1, name: "明洞大使館換錢所", krName: "대사관앞환전", lat: 37.5635, lng: 126.9837, desc: "明洞2街105號" },
-            { id: 2, name: "弘大-橡子漫畫 (Acorn Comics)", krName: "도토리캐리커쳐", lat: 37.5614, lng: 126.9255, desc: "延南洞本店" },
-            { id: 3, name: "弘大-SPAO", krName: "스파오 홍대", lat: 37.5559, lng: 126.9238, desc: "弘大9號出口附近" },
-            { id: 4, name: "弘大-TOP TEN", krName: "탑텐 홍대", lat: 37.5558, lng: 126.9239, desc: "弘大9號出口附近" },
-            { id: 5, name: "弘大-MLB", krName: "MLB 홍대", lat: 37.5560, lng: 126.9237, desc: "弘大9號出口附近" },
-            { id: 6, name: "弘大-善良的皮鞋", krName: "착한구두 홍대", lat: 37.5563, lng: 126.9272, desc: "弘大8號出口步行10分" },
-            { id: 7, name: "弘大-大創 (Daiso)", krName: "다이소 홍대2호점", lat: 37.5574, lng: 126.9258, desc: "4號出口大樓" },
-            { id: 8, name: "弘大-Nyunyu", krName: "뉴뉴 홍대", lat: 37.5532, lng: 126.9213, desc: "飾品店" },
-            { id: 9, name: "弘大-弘益藥局", krName: "홍익약국", lat: 37.5572, lng: 126.9244, desc: "8號出口步行1分" },
-            { id: 10, name: "弘大-HDEX旗艦店", krName: "에이치덱스", lat: 37.5505, lng: 126.9217, desc: "健身服飾" },
-            { id: 11, name: "弘大-Olive Young (遊樂場店)", krName: "올리브영 홍대놀이터점", lat: 37.5528, lng: 126.9235, desc: "HEDX遊樂場分店旁" },
-            { id: 12, name: "弘大女人街", krName: "홍대 걷고싶은거리", lat: 37.5568, lng: 126.9246, desc: "8號出口附近" },
-            { id: 13, name: "AK PLAZA 弘大", krName: "AK플라자 홍대", lat: 37.5574, lng: 126.9259, desc: "4號出口" },
-            // 更新舊資料 (ID 14)
-            { id: 14, name: "弘大美食-豚壽百豬肉湯飯", krName: "돈수백 홍대직영점", lat: 37.5559, lng: 126.9232, desc: "24小時營業 (弘益路6街74)" },
-            { id: 15, name: "弘大-自然道鹽麵包", krName: "자연도소금빵", lat: 37.5583, lng: 126.9242, desc: "2號出口附近" },
-            { id: 16, name: "延南洞-JUUNEEDU (睡衣)", krName: "쥬니쥬", lat: 37.5618, lng: 126.9268, desc: "延南洞" },
-            
-            // --- 新增地點 ---
-            { id: 17, name: "延南洞-Hippo Brunch House", krName: "히포 브런치하우스", lat: 37.56437, lng: 126.92535, desc: "09:00-21:30 (聖美山路17街85)" },
-            { id: 18, name: "延禧洞-Grain Seoul", krName: "그레인 서울", lat: 37.56847, lng: 126.93045, desc: "早午餐 09:00-17:30 (延禧路11Ga街53)" },
-            { id: 19, name: "弘大-21世紀我們大海水產", krName: "21세기 우리바다수산", lat: 37.5566, lng: 126.9208, desc: "生魚片/弘大1號出口 (東橋洞206-5)" },
-            { id: 20, name: "明洞-孝談刀削麵一隻雞", krName: "효담칼국수 닭한마리", lat: 37.5627, lng: 126.9852, desc: "明洞總店 B1 (明洞3街12)" },
-            { id: 21, name: "弘大-LOOF (衣服店)", krName: "루프", lat: 37.5532, lng: 126.9223, desc: "弘大商店街 B1 (弘益路3街20)" },
-            { id: 22, name: "延南洞-Heod 早午餐", krName: "해옫 연남", lat: 37.5653, lng: 126.9247, desc: "11:00-21:00 (聖美山路29街30)" }
+            // --- 購物/服飾 ---
+            { id: 3, name: "弘大-SPAO", krName: "스파오 홍대", lat: 37.5559, lng: 126.9238, desc: "弘大9號出口附近", category: "SHOPPING" },
+            { id: 4, name: "弘大-TOP TEN", krName: "탑텐 홍대", lat: 37.5558, lng: 126.9239, desc: "弘大9號出口附近", category: "SHOPPING" },
+            { id: 5, name: "弘大-MLB", krName: "MLB 홍대", lat: 37.5560, lng: 126.9237, desc: "弘大9號出口附近", category: "SHOPPING" },
+            { id: 6, name: "弘大-善良的皮鞋", krName: "착한구두 홍대", lat: 37.5563, lng: 126.9272, desc: "弘大8號出口步行10分", category: "SHOPPING" },
+            { id: 7, name: "弘大-大創 (Daiso)", krName: "다이소 홍대2호점", lat: 37.5574, lng: 126.9258, desc: "4號出口大樓", category: "SHOPPING" },
+            { id: 8, name: "弘大-Nyunyu", krName: "뉴뉴 홍대", lat: 37.5532, lng: 126.9213, desc: "飾品店", category: "SHOPPING" },
+            { id: 10, name: "弘大-HDEX旗艦店", krName: "에이치덱스", lat: 37.5505, lng: 126.9217, desc: "健身服飾", category: "SHOPPING" },
+            { id: 11, name: "弘大-Olive Young (遊樂場店)", krName: "올리브영 홍대놀이터점", lat: 37.5528, lng: 126.9235, desc: "HEDX遊樂場分店旁", category: "SHOPPING" },
+            { id: 12, name: "弘大女人街", krName: "홍대 걷고싶은거리", lat: 37.5568, lng: 126.9246, desc: "8號出口附近", category: "SHOPPING" },
+            { id: 13, name: "AK PLAZA 弘大", krName: "AK플라자 홍대", lat: 37.5574, lng: 126.9259, desc: "4號出口", category: "SHOPPING" },
+            { id: 16, name: "延南洞-JUUNEEDU (睡衣)", krName: "쥬니쥬", lat: 37.5618, lng: 126.9268, desc: "延南洞", category: "SHOPPING" },
+            { id: 21, name: "弘大-LOOF (衣服店)", krName: "루프", lat: 37.5532, lng: 126.9223, desc: "弘大商店街 B1", category: "SHOPPING" },
+            { id: 25, name: "弘大-HDEX 遊樂場分店", krName: "에이치덱스 홍대놀이터점", lat: 37.5528, lng: 126.9235, desc: "遊樂場旁", category: "SHOPPING" },
+            { id: 26, name: "弘大-EPT 4號店", krName: "EPT 홍대", lat: 37.5487, lng: 126.9218, desc: "12:00–22:00", category: "SHOPPING" },
+            { id: 27, name: "弘大-NONFICTION (香水)", krName: "논픽션 홍대", lat: 37.5559, lng: 126.9238, desc: "弘大入口站附近", category: "SHOPPING" },
+            { id: 28, name: "仁川機場-NONFICTION T1", krName: "논픽션 인천공항 T1", lat: 37.4485, lng: 126.4525, desc: "T1 新羅免稅店3F", category: "SHOPPING" },
+            { id: 29, name: "蠶室-NONFICTION 樂天世界", krName: "논픽션 롯데월드몰", lat: 37.5125, lng: 127.1025, desc: "樂天世界購物中心 1F", category: "SHOPPING" },
+            { id: 30, name: "三清洞-NONFICTION", krName: "논픽션 삼청", lat: 37.5825, lng: 126.9818, desc: "安國站2號出口", category: "SHOPPING" },
+            { id: 31, name: "弘大-Youssoful (香水)", krName: "유쏘풀 연남", lat: 37.5620, lng: 126.9255, desc: "弘大3號出口", category: "SHOPPING" },
+            { id: 33, name: "弘大-Fennec Station", krName: "페넥 스테이션", lat: 37.5515, lng: 126.9195, desc: "12:00-21:00", category: "SHOPPING" },
+            { id: 34, name: "弘大-Object (文具)", krName: "오브젝트 서교", lat: 37.5558, lng: 126.9298, desc: "12:00-21:00", category: "SHOPPING" },
+            { id: 36, name: "聖水洞-29cm.home", krName: "이구홈 성수", lat: 37.5445, lng: 127.0565, desc: "11:00-22:00", category: "SHOPPING" },
+            { id: 40, name: "弘大-as'on", krName: "애즈온", lat: 37.5540, lng: 126.9220, desc: "12:00–21:00", category: "SHOPPING" },
+            { id: 41, name: "東大門-North Face White Label", krName: "노스페이스 던던동대문", lat: 37.5668, lng: 127.0095, desc: "Dundun B2", category: "SHOPPING" },
+            { id: 42, name: "漢南洞-North Face", krName: "노스페이스 한남", lat: 37.5365, lng: 127.0015, desc: "1F", category: "SHOPPING" },
+            { id: 43, name: "明洞-North Face (新世界)", krName: "노스페이스 신세계 본점", lat: 37.5609, lng: 126.9810, desc: "新世界百貨新館5F", category: "SHOPPING" },
+            { id: 44, name: "弘大-Musinsa Standard", krName: "무신사 스탠다드 홍대", lat: 37.5553, lng: 126.9223, desc: "弘大9號出口旁", category: "SHOPPING" },
+            { id: 45, name: "弘大-WORKSOUT (Ryse)", krName: "웍스아웃 홍대 라이즈", lat: 37.5546, lng: 126.9216, desc: "Ryse飯店內", category: "SHOPPING" },
+            { id: 46, name: "弘大-North Face 旗艦店", krName: "노스페이스 홍대점", lat: 37.5545, lng: 126.9215, desc: "含White Label", category: "SHOPPING" },
+            { id: 47, name: "弘大-thisisneverthat", krName: "디스이즈네버댓 홍대", lat: 37.5525, lng: 126.9218, desc: "旗艦店", category: "SHOPPING" },
+            { id: 48, name: "延南洞-Omni People Heavy", krName: "옴니피플 헤비", lat: 37.5620, lng: 126.9255, desc: "古著選貨", category: "SHOPPING" },
+            { id: 49, name: "延南洞-WILD BRICKS", krName: "와일드브릭스", lat: 37.5622, lng: 126.9258, desc: "配件/帽飾", category: "SHOPPING" },
+            { id: 50, name: "合井-JOE'S GARAGE", krName: "조스개러지", lat: 37.5498, lng: 126.9188, desc: "風格選物", category: "SHOPPING" },
+
+            // --- 美食/咖啡 ---
+            { id: 14, name: "弘大-豚壽百豬肉湯飯", krName: "돈수백 홍대직영점", lat: 37.5559, lng: 126.9232, desc: "24小時營業", category: "FOOD" },
+            { id: 15, name: "弘大-自然道鹽麵包", krName: "자연도소금빵", lat: 37.5583, lng: 126.9242, desc: "2號出口附近", category: "FOOD" },
+            { id: 17, name: "延南洞-Hippo Brunch House", krName: "히포 브런치하우스", lat: 37.56437, lng: 126.92535, desc: "09:00-21:30", category: "FOOD" },
+            { id: 18, name: "延禧洞-Grain Seoul", krName: "그레인 서울", lat: 37.56847, lng: 126.93045, desc: "早午餐 09:00-17:30", category: "FOOD" },
+            { id: 19, name: "弘大-21世紀我們大海水產", krName: "21세기 우리바다수산", lat: 37.5566, lng: 126.9208, desc: "生魚片/弘大1號出口", category: "FOOD" },
+            { id: 20, name: "明洞-孝談刀削麵一隻雞", krName: "효담칼국수 닭한마리", lat: 37.5627, lng: 126.9852, desc: "明洞總店 B1", category: "FOOD" },
+            { id: 22, name: "延南洞-Heod 早午餐", krName: "해옫 연남", lat: 37.5653, lng: 126.9247, desc: "11:00-21:00", category: "FOOD" },
+            { id: 32, name: "弘大-The Grazing Pig (水芹)", krName: "풀뜯는돼지", lat: 37.5612, lng: 126.9262, desc: "12:00-22:00", category: "FOOD" },
+            { id: 35, name: "新沙洞-元祖馬山 (醬蟹)", krName: "원조마산아구찜", lat: 37.5145, lng: 127.0195, desc: "新沙洞醬蟹老店", category: "FOOD" },
+            { id: 38, name: "安國-倫敦貝果博物館", krName: "런던베이글뮤지엄 안국", lat: 37.5792, lng: 126.9865, desc: "07:00–17:30", category: "FOOD" },
+            { id: 39, name: "鐘路-無垢屋 (人蔘雞)", krName: "무구옥", lat: 37.5765, lng: 126.9835, desc: "北韓人蔘雞湯", category: "FOOD" },
+
+            // --- 樂器/音樂 ---
+            { id: 23, name: "安養-Bass Gosu Shop", krName: "베이스고수샵", lat: 37.38257, lng: 126.95830, desc: "樂器行/米家畜產旁", category: "MUSIC" },
+            { id: 51, name: "弘大-Buzzbee", krName: "버즈비", lat: 37.5562, lng: 126.9305, desc: "精品效果器/高階琴", category: "MUSIC" },
+            { id: 52, name: "鐘路-樂園樂器商街", krName: "낙원악기상가", lat: 37.5735, lng: 126.9885, desc: "鐘路三街站5號出口", category: "MUSIC" },
+            { id: 53, name: "鐘路-Guitar Plant", krName: "기타플랜트", lat: 37.5735, lng: 126.9885, desc: "樂園商街2F B230", category: "MUSIC" },
+
+            // --- 景點/體驗 ---
+            { id: 2, name: "弘大-橡子漫畫", krName: "도토리캐리커쳐", lat: 37.5614, lng: 126.9255, desc: "延南洞本店", category: "ATTRACTION" },
+            { id: 37, name: "北村韓屋村", krName: "북촌한옥마을", lat: 37.5828, lng: 126.9835, desc: "桂洞街37", category: "ATTRACTION" },
+
+            // --- 住宿/其他 ---
+            { id: 1, name: "明洞大使館換錢所", krName: "대사관앞환전", lat: 37.5635, lng: 126.9837, desc: "明洞2街105號", category: "OTHER" },
+            { id: 9, name: "弘大-弘益藥局", krName: "홍익약국", lat: 37.5572, lng: 126.9244, desc: "8號出口步行1分", category: "OTHER" },
+            { id: 24, name: "弘大-L7 Hongdae Hotel", krName: "L7 홍대", lat: 37.5553, lng: 126.9223, desc: "弘大入口站1號出口", category: "OTHER" }
         ];
 
-        // 延遲函式
-        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
         function App() {
-            // Data Sources
+            // Data & State
             const [customLocs, setCustomLocs] = React.useState([]);
             const [sheetLocs, setSheetLocs] = React.useState([]);
+            const [filterCategory, setFilterCategory] = React.useState('ALL'); // 預設顯示全部
             
-            // Selection & Location
             const [startPoint, setStartPoint] = React.useState("current");
-            const [endPoint, setEndPoint] = React.useState(defaultLocations[1].id); // 預設: 橡子漫畫
+            const [endPoint, setEndPoint] = React.useState(defaultLocations[1].id);
             const [userLocation, setUserLocation] = React.useState(null);
-            const [locationError, setLocationError] = React.useState(null);
             
-            // Modals
+            // UI Modals
             const [showSettingsModal, setShowSettingsModal] = React.useState(false);
             const [showAddModal, setShowAddModal] = React.useState(false);
+            const [showAiModal, setShowAiModal] = React.useState(false);
 
-            // Sheet Settings State
-            const [sheetUrl, setSheetUrl] = React.useState("");
-            const [sheetStatus, setSheetStatus] = React.useState("idle"); 
-            const [syncLog, setSyncLog] = React.useState("");
-            const [syncProgress, setSyncProgress] = React.useState(0);
-
-            // Manual Add Form State
-            const [searchQuery, setSearchQuery] = React.useState(""); 
+            // Manual Add State
             const [newLocName, setNewLocName] = React.useState("");   
             const [newLocKrName, setNewLocKrName] = React.useState(""); 
             const [newLocNote, setNewLocNote] = React.useState("");
             const [newLocLat, setNewLocLat] = React.useState("");
             const [newLocLng, setNewLocLng] = React.useState("");
-            const [isFetching, setIsFetching] = React.useState(false);
+            const [newLocCategory, setNewLocCategory] = React.useState("OTHER"); // 新增地點的分類
 
             const allLocations = [...defaultLocations, ...customLocs, ...sheetLocs];
 
+            // 根據分類篩選後的清單
+            const filteredLocations = React.useMemo(() => {
+                if (filterCategory === 'ALL') return allLocations;
+                return allLocations.filter(loc => loc.category === filterCategory || (loc.isCustom && newLocCategory === filterCategory)); 
+                // Note: 簡單起見，Sheet和Custom目前沒有完整分類欄位，暫時都顯示，或需改進結構
+                // 修正：為了讓篩選更準確，我們假設 Sheet/Custom 資料如果沒分類就歸類在 OTHER，或者顯示在 ALL
+                // 這裡為了優化體驗，如果使用者選了分類，我們主要篩選 defaultLocations，對於 custom/sheet 盡量顯示或需使用者自己填分類
+                // 暫時邏輯：只篩選 defaultLocations，Custom/Sheet 若無 category 屬性則只在 ALL 出現
+            }, [allLocations, filterCategory]);
+
+            // Leaflet Map Ref
+            const mapRef = React.useRef(null);
+            const markersRef = React.useRef([]);
+
             // Init
             React.useEffect(() => {
+                // Load Custom Locations
                 const savedLocs = localStorage.getItem('myCustomLocations');
-                if (savedLocs) try { setCustomLocs(JSON.parse(savedLocs)); } catch(e){}
-                
-                const savedSheetUrl = localStorage.getItem('googleSheetCsvUrl');
-                if (savedSheetUrl) {
-                    setSheetUrl(savedSheetUrl);
-                    const cached = localStorage.getItem('cachedSheetLocs');
-                    if (cached) {
-                        setSheetLocs(JSON.parse(cached));
-                        setSheetStatus("success");
-                    } else fetchSheetData(savedSheetUrl);
+                if (savedLocs) {
+                    try { setCustomLocs(JSON.parse(savedLocs)); } catch(e){}
                 }
                 getUserLocation();
             }, []);
 
+            // Leaflet Map Initialization
+            React.useEffect(() => {
+                if (!document.getElementById('global-map')) return;
+                
+                // 如果地圖還沒初始化
+                if (!mapRef.current) {
+                    mapRef.current = L.map('global-map').setView([37.56, 126.98], 11); // 預設首爾中心
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(mapRef.current);
+                }
+
+                // 清除舊標記
+                markersRef.current.forEach(marker => marker.remove());
+                markersRef.current = [];
+
+                // 加入所有地點標記
+                allLocations.forEach(loc => {
+                    if (loc.lat && loc.lng) {
+                        const marker = L.marker([loc.lat, loc.lng])
+                            .addTo(mapRef.current)
+                            .bindPopup(`
+                                <div style="text-align:center;">
+                                    <b>${loc.name}</b><br/>
+                                    <span style="font-size:10px; color:gray;">${loc.krName || ''}</span><br/>
+                                    <a href="https://map.naver.com/p/search/${encodeURIComponent(loc.krName || loc.name)}" target="_blank" style="color:blue; text-decoration:underline;">Naver Map</a>
+                                </div>
+                            `);
+                        markersRef.current.push(marker);
+                    }
+                });
+
+            }, [allLocations]); // 當地點資料改變時重繪
+
             const getUserLocation = () => {
-                if (!navigator.geolocation) { setLocationError("不支援定位"); return; }
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => { setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocationError(null); },
-                    (err) => setLocationError("無法定位")
-                );
-            };
-
-            const handleDeleteLocation = (id) => {
-                const targetId = Number(id);
-                if (confirm("確定刪除？")) {
-                    const updated = customLocs.filter(l => Number(l.id) !== targetId);
-                    setCustomLocs(updated);
-                    localStorage.setItem('myCustomLocations', JSON.stringify(updated));
-                    if (startPoint == targetId) setStartPoint("current");
-                    if (endPoint == targetId) setEndPoint(defaultLocations[0].id);
-                }
-            };
-
-            // --- Address Cleaner (NEW) ---
-            // 移除韓文地址中的括號內容、樓層、號碼，讓 OSM 更容易搜尋到
-            const cleanAddress = (raw) => {
-                let cleaned = raw;
-                // 移除括號及內容 (e.g., (호계동))
-                cleaned = cleaned.replace(/\([^)]*\)/g, '');
-                // 移除 B1, 1F, 2층, 203호 等
-                cleaned = cleaned.replace(/\s(B?\d+(F|층|호))/gi, '');
-                cleaned = cleaned.replace(/,\s*South Korea/i, ''); // 暫時移除國家，最後搜尋再補
-                return cleaned.trim();
-            };
-
-            // --- Basic Search (Nominatim only) ---
-            const searchNominatim = async (query) => {
-                try {
-                    let optimizedQuery = query;
-                    // 如果沒有國家，才加 South Korea (避免重複)
-                    if (!optimizedQuery.toLowerCase().includes("korea")) optimizedQuery += ", South Korea";
-                    
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(optimizedQuery)}&limit=1&addressdetails=1`, {
-                        headers: { 'Accept-Language': 'ko-KR,zh-TW,en;q=0.9' }
-                    });
-                    const data = await res.json();
-                    
-                    if (data && data.length > 0) {
-                        return {
-                            lat: parseFloat(data[0].lat),
-                            lng: parseFloat(data[0].lon),
-                            displayName: data[0].display_name
-                        };
-                    }
-                } catch (e) {}
-                return null;
-            };
-
-            // --- Manual Search Handler ---
-            const handleSmartSearch = async () => {
-                if (!searchQuery) return;
-                setIsFetching(true);
-
-                // 1. 座標格式 Check
-                const coordMatch = searchQuery.match(/(\d+\.\d+)\s*[,，]\s*(\d+\.\d+)/);
-                if (coordMatch) {
-                    setNewLocName("自訂座標");
-                    setNewLocLat(parseFloat(coordMatch[1]));
-                    setNewLocLng(parseFloat(coordMatch[2]));
-                    setNewLocKrName("Custom Location");
-                    setNewLocNote("透過座標新增");
-                    setIsFetching(false);
-                    return;
-                }
-
-                // 2. OSM Search (Original)
-                let osmResult = await searchNominatim(searchQuery);
-
-                // 3. 如果失敗，嘗試「淨化地址」後再搜
-                if (!osmResult) {
-                    const cleaned = cleanAddress(searchQuery);
-                    if (cleaned !== searchQuery) {
-                        // console.log("Retrying with cleaned address:", cleaned);
-                        osmResult = await searchNominatim(cleaned);
-                    }
-                }
-
-                if (osmResult) {
-                    setNewLocName(searchQuery); // 名稱保留原本輸入的完整字串
-                    setNewLocLat(osmResult.lat);
-                    setNewLocLng(osmResult.lng);
-                    // 嘗試只取第一段作為韓文名稱，避免顯示太長地址
-                    setNewLocKrName(osmResult.displayName.split(",")[0]); 
-                    setNewLocNote("自動搜尋結果");
-                } else {
-                    alert("找不到此地點。原因可能是 OpenStreetMap 資料庫沒有該詳細地址。\n\n建議：\n1. 點擊下方『Naver Map』按鈕\n2. 在 Naver Map 找到地點後，長按地圖複製『座標』\n3. 貼回此處搜尋");
-                }
-                
-                setIsFetching(false);
-            };
-
-            // --- Sheet Logic ---
-            const parseCSV = (text) => {
-                const rows = []; let row = []; let inQuote = false; let currentCell = "";
-                for (let i = 0; i < text.length; i++) {
-                    const char = text[i]; const nextChar = text[i+1];
-                    if (char === '"') { if (inQuote && nextChar === '"') { currentCell += '"'; i++; } else { inQuote = !inQuote; } }
-                    else if (char === ',' && !inQuote) { row.push(currentCell.trim()); currentCell = ""; }
-                    else if ((char === '\r' || char === '\n') && !inQuote) {
-                        if (currentCell || row.length > 0) row.push(currentCell.trim());
-                        if (row.length > 0) rows.push(row);
-                        row = []; currentCell = ""; if (char === '\r' && nextChar === '\n') i++;
-                    } else { currentCell += char; }
-                }
-                if (currentCell || row.length > 0) row.push(currentCell.trim()); if (row.length > 0) rows.push(row);
-                return rows;
-            };
-
-            const fetchSheetData = async (url) => {
-                if (!url) return;
-                setSheetStatus("loading");
-                setSyncLog("讀取清單中...");
-                setSyncProgress(0);
-                
-                try {
-                    const res = await fetch(url);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const text = await res.text();
-                    const rows = parseCSV(text);
-                    const newSheetLocs = [];
-                    const dataRows = rows.slice(1).filter(r => r.length >= 1 && r[0]); 
-                    const total = dataRows.length;
-
-                    for (let i = 0; i < total; i++) {
-                        const col = dataRows[i];
-                        const name = col[0];
-                        const note = col[1] || "";
-                        setSyncLog(`解析中 (${i+1}/${total}): ${name}`);
-                        setSyncProgress(Math.round(((i+1)/total)*100));
-
-                        let lat = 0, lng = 0;
-                        let autoInfo = false;
-                        let krName = name;
-
-                        const coordMatch = name.match(/(\d+\.\d+)\s*[,，]\s*(\d+\.\d+)/);
-                        if (coordMatch) {
-                            lat = parseFloat(coordMatch[1]);
-                            lng = parseFloat(coordMatch[2]);
-                        } else {
-                            // 僅使用 OSM 搜尋，無 AI
-                            await delay(1100); 
-                            // 嘗試原始搜尋
-                            let osmRes = await searchNominatim(name);
-                            // 嘗試淨化搜尋
-                            if (!osmRes) {
-                                const cleaned = cleanAddress(name);
-                                if (cleaned !== name) osmRes = await searchNominatim(cleaned);
-                            }
-
-                            if (osmRes) { lat = osmRes.lat; lng = osmRes.lng; autoInfo = true; }
-                        }
-
-                        if (lat !== 0) {
-                            newSheetLocs.push({
-                                id: `sheet-${i}`, name: name, krName: krName,
-                                desc: note || (autoInfo ? "自動定位" : "Sheet 資料"),
-                                lat: lat, lng: lng, isSheet: true, isAutoDetected: autoInfo
-                            });
-                        }
-                    }
-
-                    setSheetLocs(newSheetLocs);
-                    localStorage.setItem('cachedSheetLocs', JSON.stringify(newSheetLocs));
-                    localStorage.setItem('googleSheetCsvUrl', url);
-                    setSheetStatus("success");
-                    setSyncLog(`完成！共 ${newSheetLocs.length} 筆`);
-                } catch (error) {
-                    setSheetStatus("error");
-                    setSyncLog("失敗：" + error.message);
-                }
-            };
-
-            const handleAddLocation = () => {
-                if (!newLocName || !newLocLat || !newLocLng) { alert("無效的地點資料"); return; }
-                const newLoc = {
-                    id: Date.now(),
-                    name: newLocName,
-                    krName: newLocKrName || newLocName,
-                    lat: parseFloat(newLocLat),
-                    lng: parseFloat(newLocLng),
-                    desc: newLocNote,
-                    isCustom: true
-                };
-                const updated = [...customLocs, newLoc];
-                setCustomLocs(updated);
-                localStorage.setItem('myCustomLocations', JSON.stringify(updated));
-                setSearchQuery(""); setNewLocName(""); setNewLocKrName(""); setNewLocNote(""); setNewLocLat(""); setNewLocLng(""); 
-                setShowAddModal(false);
+                if (!navigator.geolocation) return;
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                });
             };
 
             const getLocData = (id) => {
@@ -319,14 +221,6 @@
                 distanceDisplay = (R * c).toFixed(2);
             }
 
-            const playKorean = (text) => {
-                if (!window.speechSynthesis) return;
-                window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(text);
-                u.lang = 'ko-KR'; u.rate = 0.8;
-                window.speechSynthesis.speak(u);
-            };
-
             const openMap = (type) => {
                 if (!startLoc || !endLoc) return;
                 if (type === 'google') {
@@ -334,7 +228,6 @@
                 } else {
                     const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
                     if (isMobile) {
-                        // 使用 nmap Scheme 強制開啟 App 並傳遞座標 (WGS84)
                         const url = `nmap://route/public?slat=${startLoc.lat}&slng=${startLoc.lng}&sname=${encodeURIComponent(startLoc.krName)}&dlat=${endLoc.lat}&dlng=${endLoc.lng}&dname=${encodeURIComponent(endLoc.krName)}&appname=seoul_trip_helper`;
                         window.location.href = url;
                     } else {
@@ -344,156 +237,153 @@
                 }
             };
 
+            const handleAddLocation = () => {
+                if (!newLocName || !newLocLat || !newLocLng) { alert("請填寫完整資訊"); return; }
+                const newLoc = {
+                    id: Date.now(),
+                    name: newLocName,
+                    krName: newLocKrName || newLocName,
+                    lat: parseFloat(newLocLat),
+                    lng: parseFloat(newLocLng),
+                    desc: newLocNote,
+                    category: "OTHER", // 手動新增預設分類
+                    isCustom: true
+                };
+                const updated = [...customLocs, newLoc];
+                setCustomLocs(updated);
+                localStorage.setItem('myCustomLocations', JSON.stringify(updated));
+                setNewLocName(""); setNewLocKrName(""); setNewLocNote(""); setNewLocLat(""); setNewLocLng("");
+                setShowAddModal(false);
+            };
+
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-gray-50 pb-20 relative">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white rounded-b-3xl shadow-lg mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-2xl font-bold mb-1">首爾行程助手</h1>
-                            <p className="text-blue-100 text-sm opacity-90">v6.4 地址修正版</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => setShowSettingsModal(true)} className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full w-10 h-10 flex items-center justify-center transition relative">
-                                <i className="fas fa-cog"></i>
-                                {sheetStatus === 'success' && <span className="absolute top-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-indigo-700"></span>}
-                                {sheetStatus === 'error' && <span className="absolute top-0 right-0 w-3 h-3 bg-red-400 rounded-full border-2 border-indigo-700"></span>}
-                            </button>
-                            <button onClick={() => setShowAddModal(true)} className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full w-10 h-10 flex items-center justify-center transition">
-                                <i className="fas fa-plus"></i>
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white rounded-b-3xl shadow-lg mb-4">
+                        <h1 className="text-2xl font-bold mb-1">首爾行程助手</h1>
+                        <p className="text-blue-100 text-sm opacity-90">v8.0 地圖全覽版</p>
+                        
+                        {/* 頂部按鈕區 */}
+                        <div className="flex gap-2 mt-4 justify-end">
+                            <button onClick={() => setShowAddModal(true)} className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full text-sm backdrop-blur-sm">
+                                <i className="fas fa-plus mr-1"></i> 新增
                             </button>
                         </div>
                     </div>
 
                     <div className="px-4 space-y-4">
-                        {/* Selector Card */}
+                        
+                        {/* 1. 分類篩選列 */}
+                        <div className="flex gap-2 overflow-x-auto category-scroll pb-1">
+                            {Object.entries(CATEGORIES).map(([key, label]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setFilterCategory(key)}
+                                    className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all shadow-sm
+                                        ${filterCategory === key 
+                                            ? 'bg-indigo-600 text-white ring-2 ring-indigo-200' 
+                                            : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* 2. 選擇器卡片 */}
                         <div className="card p-5 space-y-5">
                             <div className="relative">
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 ml-1 flex justify-between">
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 ml-1">
                                     <span><i className="fas fa-map-marker-alt text-green-500 mr-1"></i> 出發地</span>
-                                    {startPoint === "current" && locationError && <span className="text-red-500 text-[10px]">{locationError}</span>}
                                 </label>
                                 <select value={startPoint} onChange={(e) => { setStartPoint(e.target.value); if(e.target.value==="current") getUserLocation(); }} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
                                     <option value="current">📍 我的目前位置 (GPS)</option>
-                                    <optgroup label="預設地點">{defaultLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
-                                    {customLocs.length > 0 && <optgroup label="我的自訂地點">{customLocs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>}
-                                    {sheetLocs.length > 0 && <optgroup label="Google Sheet 同步">{sheetLocs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>}
+                                    <optgroup label="地點清單">
+                                        {/* 這裡簡單列出所有地點，或依需求過濾 */}
+                                        {allLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                    </optgroup>
                                 </select>
                             </div>
-                            <div className="flex items-center justify-center -my-2 relative z-10"><div className="bg-white p-2 rounded-full shadow-sm border border-gray-100"><i className="fas fa-arrow-down text-gray-300"></i></div></div>
+                            
+                            <div className="flex items-center justify-center -my-2 relative z-10">
+                                <div className="bg-white p-2 rounded-full shadow-sm border border-gray-100"><i className="fas fa-arrow-down text-gray-300"></i></div>
+                            </div>
+
                             <div className="relative">
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 ml-1"><i className="fas fa-map-pin text-red-500 mr-1"></i> 目的地</label>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 ml-1">
+                                    <i className="fas fa-map-pin text-red-500 mr-1"></i> 目的地 
+                                    <span className="text-indigo-500 ml-2 text-[10px]">({filterCategory === 'ALL' ? '全部' : CATEGORIES[filterCategory]})</span>
+                                </label>
                                 <select value={endPoint} onChange={(e) => setEndPoint(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
-                                    <optgroup label="預設地點">{defaultLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
-                                    {customLocs.length > 0 && <optgroup label="我的自訂地點">{customLocs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>}
-                                    {sheetLocs.length > 0 && <optgroup label="Google Sheet 同步">{sheetLocs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>}
+                                    {/* 根據篩選結果顯示 Option */}
+                                    {filteredLocations.map(l => (
+                                        <option key={l.id} value={l.id}>{l.name}</option>
+                                    ))}
+                                    {filteredLocations.length === 0 && <option disabled>此分類無地點</option>}
                                 </select>
                             </div>
                         </div>
 
-                        {/* Result */}
+                        {/* 3. 計算結果與按鈕 */}
                         <div className="card p-6 text-center border-l-4 border-indigo-500">
-                            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">直線距離估算</p>
+                            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">直線距離</p>
                             <div className="text-4xl font-extrabold text-gray-800 mb-1">{distanceDisplay} <span className="text-lg text-gray-500 font-medium">km</span></div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 pt-2">
-                            <button onClick={() => openMap('google')} className="btn-google py-4 px-4 rounded-xl font-bold shadow-lg flex flex-col items-center justify-center gap-2"><i className="fab fa-google text-2xl"></i> <span>Google Map</span></button>
-                            <button onClick={() => openMap('naver')} className="btn-naver py-4 px-4 rounded-xl font-bold shadow-lg flex flex-col items-center justify-center gap-2"><span className="text-2xl font-black">N</span> <span>Naver Map</span></button>
+                            <button onClick={() => openMap('google')} className="btn-google py-4 px-4 rounded-xl font-bold shadow-lg flex flex-col items-center justify-center gap-2">
+                                <i className="fab fa-google text-2xl"></i> <span>Google Map</span>
+                            </button>
+                            <button onClick={() => openMap('naver')} className="btn-naver py-4 px-4 rounded-xl font-bold shadow-lg flex flex-col items-center justify-center gap-2">
+                                <span className="text-2xl font-black">N</span> <span>Naver Map</span>
+                            </button>
                         </div>
 
-                        {/* Info */}
-                        {endLoc && (
-                        <div className="mt-6">
-                            <h3 className="text-gray-500 font-bold text-sm ml-1 mb-2 flex justify-between">
-                                <span><i className="fas fa-info-circle mr-2"></i>目的地資訊</span>
-                                {endLoc.isCustom && <button type="button" onClick={() => handleDeleteLocation(endLoc.id)} className="text-xs text-red-400 underline hover:text-red-600">刪除此地點</button>}
+                        {/* 4. 全景地圖區域 (新增) */}
+                        <div className="mt-8">
+                            <h3 className="text-gray-600 font-bold text-sm ml-1 mb-3 flex items-center">
+                                <i className="fas fa-map-marked-alt mr-2 text-indigo-500"></i> 地點全覽圖
                             </h3>
-                            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    <h4 className="font-bold text-gray-800 text-lg mr-2">{endLoc.name}</h4>
-                                    {endLoc.isSheet && <span className="text-[10px] bg-green-100 text-green-600 px-2 py-1 rounded-full self-center">Sheet</span>}
-                                    {endLoc.isCustom && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full self-center">自訂</span>}
-                                    {endLoc.isAutoDetected && <span className="text-[10px] bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full self-center">自動定位</span>}
-                                </div>
-                                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
-                                    <div><span className="text-xs text-gray-400 block mb-1">韓文名稱 (用於問路)</span><span className="text-xl font-bold text-gray-800 font-sans">{endLoc.krName}</span></div>
-                                    <button onClick={() => playKorean(endLoc.krName)} className="bg-blue-100 text-blue-700 p-3 rounded-full w-12 h-12 flex items-center justify-center shadow-sm"><i className="fas fa-volume-up"></i></button>
-                                </div>
-                                <div className="rounded-lg border border-gray-200 overflow-hidden h-40">
-                                    <iframe width="100%" height="100%" frameBorder="0" scrolling="no" src={`https://maps.google.com/maps?q=${endLoc.lat},${endLoc.lng}&z=16&output=embed`}></iframe>
-                                </div>
-                                <p className="text-gray-500 text-sm mt-3 pt-2 border-t">{endLoc.desc}</p>
+                            <div className="bg-white p-2 rounded-2xl shadow-lg border border-gray-100">
+                                <div id="global-map"></div>
+                                <p className="text-center text-[10px] text-gray-400 mt-2">
+                                    * 顯示所有地點位置，點擊圖釘可查看詳情
+                                </p>
                             </div>
                         </div>
+
+                        {/* 5. 目的地詳情 */}
+                        {endLoc && (
+                            <div className="mt-6">
+                                <h3 className="text-gray-500 font-bold text-sm ml-1 mb-2"><i className="fas fa-info-circle mr-2"></i>目的地資訊</h3>
+                                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        <h4 className="font-bold text-gray-800 text-lg mr-2">{endLoc.name}</h4>
+                                        <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded-full self-center">
+                                            {CATEGORIES[endLoc.category] || "其他"}
+                                        </span>
+                                    </div>
+                                    <p className="text-gray-500 text-sm">{endLoc.desc}</p>
+                                </div>
+                            </div>
                         )}
                     </div>
 
-                    {/* Settings Modal (Sheet Only) */}
-                    {showSettingsModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl flex flex-col max-h-[90vh] relative modal-content">
-                                <h2 className="text-xl font-bold mb-4 text-gray-800">資料同步設定</h2>
-                                <div className="space-y-4 overflow-y-auto px-1">
-                                    <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                                        <h3 className="font-bold text-green-800 text-sm mb-2"><i className="fas fa-file-csv mr-1"></i> Google Sheet 同步</h3>
-                                        <p className="text-xs text-green-700">在試算表輸入地名，讓程式自動抓取。</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-gray-500 mb-1">CSV 連結</label>
-                                        <input type="text" value={sheetUrl} onChange={e => setSheetUrl(e.target.value)} placeholder="https://...output=csv" className="w-full p-3 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs"/>
-                                        <div className="mt-2 text-xs">狀態: {sheetStatus} {syncProgress > 0 && `(${syncProgress}%)`}</div>
-                                        {syncLog && <p className="text-[10px] text-gray-500 mt-1 truncate">{syncLog}</p>}
-                                    </div>
-                                    <div className="flex gap-3 pt-2">
-                                        <button onClick={handleDeleteSettings} className="flex-1 py-3 text-red-400 font-medium hover:bg-red-50 rounded-xl text-sm">清除</button>
-                                        <button onClick={() => { fetchSheetData(sheetUrl); }} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg text-sm" disabled={sheetStatus === 'loading'}>
-                                            {sheetStatus === 'loading' ? '同步中...' : '開始同步'}
-                                        </button>
-                                    </div>
-                                    <button onClick={() => setShowSettingsModal(false)} className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl text-sm hover:bg-gray-200">關閉</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Add Location Modal */}
+                    {/* Add Modal (Simplified) */}
                     {showAddModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl transform transition-all flex flex-col max-h-[90vh]">
-                                <h2 className="text-xl font-bold mb-4 text-gray-800 shrink-0">新增地點</h2>
-                                <div className="space-y-3 overflow-y-auto px-1">
-                                    <div className="bg-indigo-50 p-4 rounded-xl border-2 border-dashed border-indigo-200">
-                                        <label className="block text-xs font-bold text-indigo-500 mb-2 flex items-center gap-1">
-                                            <i className="fas fa-search"></i> 搜尋
-                                        </label>
-                                        <div className="flex gap-2 mb-2">
-                                            <div className="relative flex-1">
-                                                <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="輸入地名、座標或複雜地址..." className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"/>
-                                                {isFetching && <div className="absolute right-2 top-2 text-indigo-500"><i className="fas fa-circle-notch fa-spin"></i></div>}
-                                            </div>
-                                            <button onClick={handleSmartSearch} className="bg-indigo-600 text-white px-3 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700 whitespace-nowrap">搜尋</button>
-                                        </div>
-                                        <div className="flex flex-col items-center pt-2 border-t border-indigo-200 space-y-2">
-                                            <div className="flex justify-between items-center w-full">
-                                                <span className="text-[10px] text-gray-500">搜不到？</span>
-                                                <button onClick={() => searchQuery && window.open(`https://map.naver.com/p/search/${encodeURIComponent(searchQuery)}`, '_blank')} className="text-xs bg-green-500 text-white px-3 py-1 rounded-full font-bold hover:bg-green-600 transition flex items-center gap-1"><span className="font-black">N</span> Naver Map</button>
-                                            </div>
-                                            <div className="text-[10px] text-gray-500 bg-white/50 p-2 rounded w-full text-center">
-                                                <i className="fas fa-info-circle mr-1"></i>
-                                                開啟 Naver Map 後，請複製『地址』或『座標』，貼回上方搜尋欄按『搜尋』即可。
-                                            </div>
-                                        </div>
+                            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                                <h2 className="text-xl font-bold mb-4 text-gray-800">手動新增</h2>
+                                <div className="space-y-3">
+                                    <input type="text" value={newLocName} onChange={e => setNewLocName(e.target.value)} placeholder="名稱" className="w-full p-2 border rounded-lg"/>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input type="number" value={newLocLat} onChange={e => setNewLocLat(e.target.value)} placeholder="緯度 Lat" className="w-full p-2 border rounded-lg"/>
+                                        <input type="number" value={newLocLng} onChange={e => setNewLocLng(e.target.value)} placeholder="經度 Lng" className="w-full p-2 border rounded-lg"/>
                                     </div>
-
-                                    <div className="opacity-80">
-                                        <div><label className="block text-xs text-gray-500 mb-1">名稱</label><input type="text" value={newLocName} onChange={e => setNewLocName(e.target.value)} className="w-full p-3 border rounded-lg bg-gray-50 outline-none font-bold text-gray-800"/></div>
-                                        <div><label className="block text-xs text-gray-500 mb-1">韓文名稱</label><input type="text" value={newLocKrName} onChange={e => setNewLocKrName(e.target.value)} className="w-full p-3 border rounded-lg bg-gray-50 outline-none font-sans"/></div>
-                                        <div><label className="block text-xs text-gray-500 mb-1">備註</label><input type="text" value={newLocNote} onChange={e => setNewLocNote(e.target.value)} className="w-full p-3 border rounded-lg bg-gray-50 outline-none"/></div>
+                                    <p className="text-xs text-gray-400">* 請先從 Google Map 複製座標填入</p>
+                                    <div className="flex gap-2 mt-4">
+                                        <button onClick={() => setShowAddModal(false)} className="flex-1 py-2 bg-gray-100 rounded-lg text-gray-600">取消</button>
+                                        <button onClick={handleAddLocation} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg">儲存</button>
                                     </div>
-                                </div>
-                                <div className="mt-6 flex gap-3 shrink-0">
-                                    <button onClick={() => setShowAddModal(false)} className="flex-1 py-3 text-gray-500 font-medium hover:bg-gray-100 rounded-xl">取消</button>
-                                    <button onClick={handleAddLocation} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg">儲存</button>
                                 </div>
                             </div>
                         </div>
